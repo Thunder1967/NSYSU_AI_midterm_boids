@@ -11,14 +11,13 @@ SCREEN_WIDTH = 1280
 SCREEN_HEIGHT = 720
 SCREEN_CNETER=(SCREEN_WIDTH/2,SCREEN_HEIGHT/2)
 FPS = 60
-sys.setrecursionlimit(10000)
 #color
 BACKGROUND_COLOR = (25,25,25)
 
 #初始化
 pygame.init()
 Screen = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-pygame.display.set_caption('boids V0.0.0')
+pygame.display.set_caption('boids V0.1.0')
 Timer = pygame.time.Clock()
 
 #載入圖片、字體
@@ -26,18 +25,25 @@ Font = os.path.join("TaipeiSansTCBeta-Regular.ttf")
 
 #全域變數
 Running=True #遊戲是否運行
-Bird_MAX_Speed = 500
-Bird_MIN_Speed = 100
-Bird_Color_Slow = pygame.math.Vector3(255,100,105)
-Bird_Color_Fast = pygame.math.Vector3(63,255,50)
+Bird_Number = 300 #bird 數量
+Bird_Size = 8 #bird 大小
+Bird_MAX_Speed = 200 #bird 最大速度
+Bird_MIN_Speed = 50 #bird 最小速度
+Bird_Color_Slow = pygame.math.Vector3(75,76,255) #bird 最慢速顏色
+Bird_Color_Fast = pygame.math.Vector3(63,255,50) #bird 最快速顏色
 Bird_Color_ChangeRate = Bird_Color_Fast-Bird_Color_Slow
-Bird_Perception_Radius = 20
-Bird_Separation_Weight = 2
-Bird_Alignment_Weight = 1.2
-Bird_Cohesion_Weight = 1
-Damping = 1-1e-3
-Movement_accuracy = 100
-DT=0
+Bird_Perception_Radius = 20 #bird 觀察範圍
+Bird_Separation_Weight = 1 #bird 分離力最大值
+Bird_Alignment_Weight = 1 #bird 對齊力最大值
+Bird_Cohesion_Weight = 1 #bird 聚集力最大值
+Damping = 1e-3 #阻力
+
+# 計算精度，若有 n 隻 bird ，則每隻 bird 需要與 n-1 隻 bird 互動，
+# 為提升效能我這裡只讓 bird 與隨機 (n-1)*Movement_Accuracy 隻 bird 互動
+# 另一種想法是讓每隻 bird 有 Movement_Accuracy 的機率"不合群"，違背自然法則，模擬自然的隨機性
+Movement_Accuracy = 0.5
+
+DT=0 #每楨之間時間間隔，確保不同楨率下動畫表現一致
 
 #物件定義
 class Bird:
@@ -48,7 +54,7 @@ class Bird:
         self.speed = (Bird_MIN_Speed+Bird_MAX_Speed)/2 #初始速率
         self.velocity = self.direction*self.speed #初始速度
         self.color = (255, 255, 255) #顏色
-        self.size = 5
+        self.size = Bird_Size
     def draw(self, screen):
         right_vector = pygame.math.Vector2(-self.direction.y,self.direction.x) #垂直於 self.direction 的向量
         #三個頂點
@@ -69,7 +75,8 @@ class Bird:
         neighbor_count = 0 # 紀錄偵測到的近鄰數量
 
         # 遍歷所有其他的 Boid
-        for i in np.random.randint(0,len(boids)-1,size=(Movement_accuracy,)):
+        for i in np.random.choice(np.arange(0,Bird_Number),
+                                  size=(math.floor(Bird_Number*Movement_Accuracy),), replace=False):
             other = boids[i]
             # 確保不是自己
             if other is not self:
@@ -79,7 +86,8 @@ class Bird:
                 # 檢查距離是否在排斥範圍內
                 if 0 < distance < Bird_Perception_Radius:
                     #計算推離力
-                    separation_force += (self.position - other.position)/distance
+
+                    separation_force += (self.position - other.position).normalize()*(Bird_MAX_Speed/distance)
                     #計算對齊力
                     alignment_force += other.velocity
                     #計算聚集中心
@@ -119,9 +127,10 @@ class Bird:
         self.direction = (self.direction+separation_force).normalize() #調整方向
         #調整速率
         self.speed += separation_force.length()
-        self.speed *= Damping
+        self.speed *= (1-Damping)
         self.speed = min(max(self.speed,Bird_MIN_Speed),Bird_MAX_Speed)
 
+        #更改顏色和速度    
         self.color = Bird_Color_Slow+Bird_Color_ChangeRate*((self.speed-Bird_MIN_Speed)/(Bird_MAX_Speed-Bird_MIN_Speed))
         self.velocity = self.direction*self.speed*DT
             
@@ -141,7 +150,7 @@ class Bird:
 
 #main
 #load
-birds=[Bird((random.uniform(0,SCREEN_WIDTH),random.uniform(0,SCREEN_HEIGHT))) for _ in range(500)]
+birds=[Bird((random.uniform(0,SCREEN_WIDTH),random.uniform(0,SCREEN_HEIGHT))) for _ in range(Bird_Number)]
 #tick
 while Running:
     #取得動作
