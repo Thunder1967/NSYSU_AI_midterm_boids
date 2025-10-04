@@ -38,7 +38,7 @@ Bird_Perception_Radius = 20 #bird 觀察範圍
 Bird_Separation_Weight = 1 #bird 分離力最大值
 Bird_Alignment_Weight = 1 #bird 對齊力最大值
 Bird_Cohesion_Weight = 1 #bird 聚集力最大值
-Bird_Flee_Weight = 5 #bird 逃跑力最大值
+Bird_Flee_Weight = 3 #bird 逃跑力最大值
 Bird_Alert_Radius = 40 #bird 警戒範圍
 
 Predator_Number = 3 #Predator 數量
@@ -46,7 +46,8 @@ Predator_Size = 10 #Predator 大小
 Predator_MIN_Speed = 40 #Predator 最小速度
 Predator_MAX_Speed = 160 #Predator 最大速度
 Predator_Perception_Radius = 60 #Predator 觀察範圍
-Predator_Track_Weight = 1
+Predator_Track_Weight = 2
+Predator_Separation_Weight = 1
 
 Obstacle_Number = 4 # Obstacle 數量
 Bounce_Damping = 0.8 # bird 碰撞時能量遞減
@@ -225,8 +226,30 @@ class Predator(Animal):
                         track_force.scale_to_length(Predator_Track_Weight)
 
         return track_force
-    def update(self, all_boids, obstacles):
-        force = self.apply_track(all_boids) #計算作用力
+    def apply_separation(self,predators):
+        separation_force = pygame.math.Vector2(0, 0)
+        neighbor_count = 0
+        
+        for predator in predators:
+            distance_vector = self.position - predator.position
+            distance = distance_vector.length()
+            
+            # 檢查是否在觀察範圍內
+            if distance < Predator_Perception_Radius and distance > 0:
+                # 施加推力
+                separation_force += distance_vector.normalize()*Predator_Perception_Radius / distance
+                neighbor_count+=1
+
+        if neighbor_count>0:
+            # 計算分離力
+            if separation_force.length()>0:
+                separation_force/=neighbor_count
+                if separation_force.length() > Predator_Separation_Weight:
+                    separation_force.scale_to_length(Predator_Separation_Weight)
+                    
+        return separation_force
+    def update(self, all_boids, obstacles,predators):
+        force = self.apply_track(all_boids)+self.apply_separation(predators) #計算作用力
         self.direction = (self.direction+force).normalize() #調整方向
         self.speed += force.length() #調整速率
 
@@ -370,7 +393,7 @@ while Running:
     for obstacle in obstacles:
         obstacle.draw(Screen)
     for predator in predators:
-        predator.update(birds,obstacles)
+        predator.update(birds,obstacles,predators)
         predator.draw(Screen)
 
     pygame.display.flip()
