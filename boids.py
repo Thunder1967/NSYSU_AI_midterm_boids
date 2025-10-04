@@ -25,6 +25,8 @@ Font = os.path.join("TaipeiSansTCBeta-Regular.ttf")
 #全域變數
 Running=True #遊戲是否運行
 Debug_AVG_FPS = {"total":0,"cnt":0} #效能檢查
+Damping = 2e-3 #阻力
+
 Bird_Number = 300 #bird 數量
 Bird_Size = 8 #bird 大小
 Bird_MAX_Speed = 200 #bird 最大速度
@@ -36,10 +38,18 @@ Bird_Perception_Radius = 20 #bird 觀察範圍
 Bird_Separation_Weight = 1 #bird 分離力最大值
 Bird_Alignment_Weight = 1 #bird 對齊力最大值
 Bird_Cohesion_Weight = 1 #bird 聚集力最大值
-Damping = 2e-3 #阻力
+Bird_Flee_Weight = 5 #bird 逃跑力最大值
+Bird_Alert_Radius = 40 #bird 警戒範圍
+
+Predator_Number = 3 #Predator 數量
+Predator_Size = 10 #Predator 大小
+Predator_MIN_Speed = 40 #Predator 最小速度
+Predator_MAX_Speed = 160 #Predator 最大速度
+Predator_Perception_Radius = 60 #Predator 觀察範圍
+Predator_Track_Weight = 1
 
 Obstacle_Number = 4 # Obstacle 數量
-BOUNCE_DAMPING = 0.5 # Obstacle 碰撞時能量遞減
+Bounce_Damping = 0.8 # bird 碰撞時能量遞減
 
 # 計算精度，若有 n 隻 bird ，則每隻 bird 需要與 n-1 隻 bird 互動，
 # 為提升效能我這裡只讓 bird 與隨機 (n-1)*Movement_Accuracy 隻 bird 互動
@@ -49,15 +59,15 @@ Movement_Accuracy = 0.5
 DT=0 #每楨之間時間間隔，確保不同楨率下動畫表現一致
 
 #物件定義
-class Bird:
-    def __init__(self,pos):
+class Animal:
+    def __init__(self,pos,size,speed,color=(255, 255, 255)):
         self.position = pygame.math.Vector2(pos['x'],pos['y']) #初始位置
-        rad=random.uniform(0, 2*np.pi)
-        self.direction = pygame.math.Vector2(np.cos(rad),np.sin(rad)) #初始方向
-        self.speed = (Bird_MIN_Speed+Bird_MAX_Speed)/2 #初始速率
+        self.direction=pygame.math.Vector2(0,0)
+        self.direction.from_polar((1,random.uniform(1,360)))#初始方向
+        self.speed = speed #初始速率
         self.velocity = self.direction*self.speed #初始速度
-        self.color = (255, 255, 255) #顏色
-        self.size = Bird_Size
+        self.color = color #顏色
+        self.size = size
     def draw(self, screen):
         right_vector = pygame.math.Vector2(-self.direction.y,self.direction.x) #垂直於 self.direction 的向量
         #三個頂點
@@ -69,6 +79,41 @@ class Bird:
                             [(int(head.x), int(head.y)), 
                              (int(left.x), int(left.y)), 
                              (int(right.x), int(right.y))])
+    def apply_bounce(self, obstacles):
+        """
+        迭代所有障礙物，並呼叫其 check_collision 方法來處理碰撞和反彈。
+        """
+        for obstacle in obstacles:
+            # 將自己（Boid 實例）傳遞給障礙物物件
+            if obstacle.check_collision(self):
+                # 處理單一碰撞後立即退出，避免 Boid 被多個障礙物邊緣重複處理
+                return
+    def basis_update(self,MAX_SPEED,MIN_SPPED,obstacles):
+        # 碰撞反彈
+        self.apply_bounce(obstacles)
+
+        #更改速度
+        self.speed *= (1-Damping)
+        self.speed = min(max(self.speed,MIN_SPPED),MAX_SPEED)
+        self.velocity = self.direction*self.speed*DT
+            
+        # 更新位置
+        self.position += self.velocity
+        
+        # 邊界處理
+        if self.position.x > SCREEN_WIDTH:
+            self.position.x = 0
+        elif self.position.x < 0:
+            self.position.x = SCREEN_WIDTH
+        
+        if self.position.y > SCREEN_HEIGHT:
+            self.position.y = 0
+        elif self.position.y < 0:
+            self.position.y = SCREEN_HEIGHT
+
+class Bird(Animal):
+    def __init__(self,pos):
+        super(Bird,self).__init__(pos,Bird_Size,(Bird_MIN_Speed+Bird_MAX_Speed)/2) 
     def apply_force(self, boids):
         separation_force = pygame.math.Vector2(0,0) #分離推力
         alignment_force = pygame.math.Vector2(0,0) #對齊力
@@ -77,7 +122,7 @@ class Bird:
 
         neighbor_count = 0 # 紀錄偵測到的近鄰數量
 
-        # 遍歷所有其他的 Boid
+        # 遍歷其他的 Boid
         for i in np.random.choice(np.arange(0,Bird_Number),
                                   size=(int(Bird_Number*Movement_Accuracy),), replace=False):
             other = boids[i]
@@ -123,44 +168,71 @@ class Bird:
                 if cohesion_force.length() > Bird_Cohesion_Weight:
                     cohesion_force.scale_to_length(Bird_Cohesion_Weight)
 
-        return separation_force+alignment_force+cohesion_force
-    def apply_bounce(self, obstacles):
-        """
-        迭代所有障礙物，並呼叫其 check_collision 方法來處理碰撞和反彈。
-        """
-        for obstacle in obstacles:
-            # 將自己（Boid 實例）傳遞給障礙物物件
-            if obstacle.check_collision(self):
-                # 處理單一碰撞後立即退出，避免 Boid 被多個障礙物邊緣重複處理
-                return
-    def update(self,all_boids,obstacles):
-        separation_force = self.apply_force(all_boids) #計算作用力
-        self.direction = (self.direction+separation_force).normalize() #調整方向
-        #調整速率
-        self.speed += separation_force.length()
-        self.speed *= (1-Damping)
-        self.speed = min(max(self.speed,Bird_MIN_Speed),Bird_MAX_Speed)
-
-        #更改顏色和速度    
-        self.color = Bird_Color_Slow+Bird_Color_ChangeRate*((self.speed-Bird_MIN_Speed)/(Bird_MAX_Speed-Bird_MIN_Speed))
-        self.velocity = self.direction*self.speed*DT
+        return separation_force+alignment_force+cohesion_force  
+    def flee_predator(self, predators):
+        flee_force = pygame.math.Vector2(0, 0)
+        neighbor_count = 0
+        
+        for predator in predators:
+            distance_vector = self.position - predator.position # 從掠食者指向 Boid 的向量
+            distance = distance_vector.length()
             
-        # 2. 更新位置
-        self.position += self.velocity
+            # 檢查是否在逃跑範圍內
+            if distance < Bird_Alert_Radius and distance > 0:
+                # 施加一個強大的推力
+                flee_force += distance_vector.normalize()*Bird_MAX_Speed / distance
+                neighbor_count+=1
+        if neighbor_count>0:
+            # 計算逃跑力
+            if flee_force.length()>0:
+                flee_force/=neighbor_count
+                if flee_force.length() > Bird_Flee_Weight:
+                    flee_force.scale_to_length(Bird_Flee_Weight)
+        return flee_force   
+    def update(self,all_boids,obstacles,predators):
+        #調整速度
+        force = self.apply_force(all_boids)+self.flee_predator(predators) #計算作用力
+        self.direction = (self.direction+force).normalize() #調整方向
+        self.speed += force.length() #調整速率
 
-        self.apply_bounce(obstacles)
-        
-        # 邊界處理
-        if self.position.x > SCREEN_WIDTH:
-            self.position.x = 0
-        elif self.position.x < 0:
-            self.position.x = SCREEN_WIDTH
-        
-        if self.position.y > SCREEN_HEIGHT:
-            self.position.y = 0
-        elif self.position.y < 0:
-            self.position.y = SCREEN_HEIGHT
+        #實際運動
+        super(Bird,self).basis_update(Bird_MAX_Speed,Bird_MIN_Speed,obstacles)
 
+        #更改顏色    
+        self.color = Bird_Color_Slow+Bird_Color_ChangeRate*((self.speed-Bird_MIN_Speed)/(Bird_MAX_Speed-Bird_MIN_Speed))
+
+class Predator(Animal):
+    def __init__(self, pos):
+        super(Predator,self).__init__(pos,Predator_Size,Predator_MAX_Speed,color=(255,30,45))
+    def apply_track(self, all_boids):
+        # 追蹤 bird
+        track_force = pygame.math.Vector2(0, 0) #追蹤力
+        if all_boids:
+            track_radius = Predator_Perception_Radius**2
+            neighbor_count = 0 # 紀錄偵測到的近鄰數量
+
+            for bird in all_boids:
+                forward_bird = bird.position-self.position
+                if track_radius>forward_bird.length_squared():
+                    track_force+=forward_bird
+                    neighbor_count+=1
+            
+            if neighbor_count>0:
+                track_force/=neighbor_count
+                if track_force.length()>0:
+                    track_force = track_force.normalize() * Predator_MAX_Speed - self.velocity
+                    if track_force.length_squared() > Predator_Track_Weight**2:
+                        track_force.scale_to_length(Predator_Track_Weight)
+
+        return track_force
+    def update(self, all_boids, obstacles):
+        force = self.apply_track(all_boids) #計算作用力
+        self.direction = (self.direction+force).normalize() #調整方向
+        self.speed += force.length() #調整速率
+
+        #實際運動
+        super(Predator,self).basis_update(Predator_MAX_Speed,Predator_MIN_Speed,obstacles)
+        
 class Obstacle:
     def __init__(self, vertices, color=(150, 150, 150)):
         # 將頂點列表轉換為 Vector2 列表，方便運算
@@ -217,104 +289,11 @@ class Obstacle:
                 
                 # 使用法線進行反射
                 boid.direction = boid.direction.reflect(normal_norm)
-                boid.speed *= BOUNCE_DAMPING
+                boid.speed *= Bounce_Damping
                 
                 return True 
                 
         return False
-    
-    # 輔助函數：計算點到線段的最短距離 (私有方法，只供內部使用)
-    def _closest_point_on_segment(self, p: pygame.math.Vector2, a: pygame.math.Vector2, b: pygame.math.Vector2) -> tuple[pygame.math.Vector2, float]:
-        """
-        計算點 p 到線段 ab 的最短距離和最近點。優化：使用長度的平方 (length_squared)
-        """
-        ab = b - a
-        
-        # 避免除以零：如果線段長度為零
-        len_sq = ab.length_squared()
-        if len_sq == 0.0:
-            # 直接返回點 a 和 p 到 a 的距離平方
-            return a, p.distance_squared_to(a)
-        
-        # 投影 t = (p - a) 向量在 ab 向量上的投影長度比例
-        # 由於 dot() 和 length_squared() 都不涉及昂貴的平方根 (sqrt) 運算，這裡效率很高
-        t = (p - a).dot(ab) / len_sq
-        
-        # 限制 t 在 [0, 1] 之間，確保最近點落在線段 ab 範圍內
-        t = max(0.0, min(1.0, t)) 
-        
-        # 計算線段上的最近點
-        closest = a + t * ab
-        
-        # 返回最近點和距離平方 (distance_sq)
-        # 再次避免使用昂貴的 distance_to()，直接使用 distance_squared_to()
-        distance_sq = p.distance_squared_to(closest) 
-        
-        return closest, distance_sq
-    
-    #真實多邊形碰撞邏輯，效能極差，已棄用
-    def polygon_collision(self, boid) -> bool:
-        """
-        從 gemini 抄來的，我也不懂
-        檢查 Boid 是否與此障礙物發生碰撞，並解決碰撞。
-        優化：嘗試使用 Bounding Box 快速剔除（這裡暫略），並優化迴圈內的計算。
-        """
-        COLLISION_RADIUS = boid.size
-        # 使用半徑的平方來與 distance_sq 比較，避免 sqrt
-        COLLISION_RADIUS_SQ = COLLISION_RADIUS ** 2 
-        
-        num_vertices = len(self.vertices)
-        
-        # 遍歷多邊形的每一條邊
-        for i in range(num_vertices):
-            v1 = self.vertices[i]
-            v2 = self.vertices[(i + 1) % num_vertices]
-            
-            # 1. 計算 Boid 位置到線段的最近點 (使用整合的輔助方法)
-            closest_pt, distance_sq = self._closest_point_on_segment(boid.position, v1, v2)
-            
-            # 2. 檢查是否發生碰撞
-            if distance_sq < COLLISION_RADIUS_SQ:
-                
-                # --- 碰撞解決 (Resolution) ---
-                
-                # a. 找出法線 (Normal)：從最近點指向 Boid
-                normal = boid.position - closest_pt
-                
-                # 再次優化：避免重複計算 length() 和 normalize()
-                normal_length = normal.length()
-                
-                if normal_length > 0:
-                    
-                    # b. 推回位置：解決穿透
-                    
-                    # 避免在迴圈外每次都呼叫 math.sqrt(distance_sq)
-                    distance = np.sqrt(distance_sq) 
-                    penetration_depth = COLLISION_RADIUS - distance
-                    
-                    # 避免多次呼叫 normalize()，在這裡計算一次
-                    normal_norm = normal / normal_length 
-                    
-                    # 沿著法線方向將 Boid 推開
-                    boid.position += normal_norm * penetration_depth
-                    
-                    # c. 速度反射（Reflection）：改變方向
-                    BOUNCE_DAMPING = 0.8 
-                    
-                    # Pygame 的 reflect 效率很高，直接使用
-                    bounce_vector = boid.velocity.reflect(normal_norm)
-                    boid.velocity = bounce_vector * BOUNCE_DAMPING
-                    
-                    # d. 更新 Boid 的方向/速率屬性
-                    if boid.velocity.length() > 0:
-                         # 由於 velocity 剛被修改，需要重新計算方向
-                         boid.direction = boid.velocity.normalize()
-                         boid.speed = boid.velocity.length()
-                    
-                    return True 
-                    
-        return False
-
     @staticmethod
     def generate_random_polygon(center_x: float, center_y: float, min_radius: float, max_radius: float, num_vertices: int) -> list[tuple[float, float]]:
         """
@@ -359,6 +338,14 @@ obstacles = [Obstacle(Obstacle.generate_random_polygon(
     random.randint(100,SCREEN_WIDTH-100),
     random.randint(100,SCREEN_HEIGHT-100),
     80,100,random.randint(4,20))) for _ in range(Obstacle_Number)]
+
+predators = [Predator(random.choice([
+    {'x':0,'y':random.randint(0,SCREEN_HEIGHT)},
+    {'x':SCREEN_WIDTH,'y':random.randint(0,SCREEN_HEIGHT)},
+    {'x':random.randint(0,SCREEN_WIDTH),'y':0},
+    {'x':random.randint(0,SCREEN_WIDTH),'y':SCREEN_HEIGHT}
+    ])) for _ in range(Predator_Number)]
+
 #tick
 while Running:
     #取得動作
@@ -378,10 +365,13 @@ while Running:
     #繪圖
     Screen.fill(BACKGROUND_COLOR)
     for bird in birds:
-        bird.update(birds,obstacles)
+        bird.update(birds,obstacles,predators)
         bird.draw(Screen)
     for obstacle in obstacles:
         obstacle.draw(Screen)
+    for predator in predators:
+        predator.update(birds,obstacles)
+        predator.draw(Screen)
 
     pygame.display.flip()
 
