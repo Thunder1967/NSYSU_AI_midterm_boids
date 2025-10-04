@@ -16,7 +16,7 @@ BACKGROUND_COLOR = (25,25,25)
 #初始化
 pygame.init()
 Screen = pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
-pygame.display.set_caption('boids V0.1.0')
+pygame.display.set_caption('boids V0.2.0')
 Timer = pygame.time.Clock()
 
 #載入圖片、字體
@@ -28,7 +28,7 @@ Debug_AVG_FPS = {"total":0,"cnt":0} #效能檢查
 Bird_Number = 300 #bird 數量
 Bird_Size = 8 #bird 大小
 Bird_MAX_Speed = 200 #bird 最大速度
-Bird_MIN_Speed = 50 #bird 最小速度
+Bird_MIN_Speed = 20 #bird 最小速度
 Bird_Color_Slow = pygame.math.Vector3(75,76,255) #bird 最慢速顏色
 Bird_Color_Fast = pygame.math.Vector3(63,255,50) #bird 最快速顏色
 Bird_Color_ChangeRate = Bird_Color_Fast-Bird_Color_Slow
@@ -36,9 +36,10 @@ Bird_Perception_Radius = 20 #bird 觀察範圍
 Bird_Separation_Weight = 1 #bird 分離力最大值
 Bird_Alignment_Weight = 1 #bird 對齊力最大值
 Bird_Cohesion_Weight = 1 #bird 聚集力最大值
-Damping = 1e-3 #阻力
+Damping = 2e-3 #阻力
 
 Obstacle_Number = 4 # Obstacle 數量
+BOUNCE_DAMPING = 0.5 # Obstacle 碰撞時能量遞減
 
 # 計算精度，若有 n 隻 bird ，則每隻 bird 需要與 n-1 隻 bird 互動，
 # 為提升效能我這裡只讓 bird 與隨機 (n-1)*Movement_Accuracy 隻 bird 互動
@@ -49,8 +50,8 @@ DT=0 #每楨之間時間間隔，確保不同楨率下動畫表現一致
 
 #物件定義
 class Bird:
-    def __init__(self,x,y):
-        self.position = pygame.math.Vector2(x,y) #初始位置
+    def __init__(self,pos):
+        self.position = pygame.math.Vector2(pos['x'],pos['y']) #初始位置
         rad=random.uniform(0, 2*np.pi)
         self.direction = pygame.math.Vector2(np.cos(rad),np.sin(rad)) #初始方向
         self.speed = (Bird_MIN_Speed+Bird_MAX_Speed)/2 #初始速率
@@ -166,11 +167,15 @@ class Obstacle:
         self.vertices = [pygame.math.Vector2(v) for v in vertices]
         self.color = color
         
-        # 為了避障邏輯方便，計算出多邊形的中心點
+        # 計算出多邊形的中心點
         if self.vertices:
             self.center = sum(self.vertices, pygame.math.Vector2(0, 0)) / len(self.vertices)
         else:
             self.center = pygame.math.Vector2(0, 0)
+
+        self.radius = 0
+        for vertix in self.vertices:
+            self.radius = max(self.radius,(vertix-self.center).length())
             
     def draw(self, screen):
         # 繪製實心多邊形
@@ -178,10 +183,49 @@ class Obstacle:
         if len(int_vertices) >= 3:
             pygame.draw.polygon(screen, self.color, int_vertices)
 
+    def check_collision(self, boid) -> bool:
+        """
+        圓形碰撞
+        極度簡化的碰撞邏輯，效能極高
+        """ 
+        # Boid 的碰撞半徑，bird 看到障礙且距離夠近時閃開
+        COLLISION_RADIUS = Bird_Perception_Radius/2
+        
+        # 1. 計算 Boid 到圓心的向量和距離
+        center_to_boid = boid.position - self.center
+        distance_sq = center_to_boid.length_squared()
+        
+        # 總碰撞半徑 (兩者半徑之和) 的平方
+        total_radius = self.radius + COLLISION_RADIUS
+        total_radius_sq = total_radius ** 2
+        
+        # 2. 檢查是否發生碰撞 (使用平方比較，避免 math.sqrt)
+        if distance_sq < total_radius_sq:
+            # 距離
+            distance = np.sqrt(distance_sq)
+            
+            # 法線 (從圓心指向 Boid 的向量)
+            normal = center_to_boid
+            
+            if distance > 0: # 避免 Boid 剛好在圓心
+                # 推回位置：解決穿透
+                penetration_depth = total_radius - distance
+                normal_norm = normal / distance # 這裡的 normal / distance 就是正規化
+                
+                # 將 Boid 沿著法線方向推開
+                boid.position += normal_norm * penetration_depth
+                
+                # 使用法線進行反射
+                boid.direction = boid.direction.reflect(normal_norm)
+                boid.speed *= BOUNCE_DAMPING
+                
+                return True 
+                
+        return False
+    
     # 輔助函數：計算點到線段的最短距離 (私有方法，只供內部使用)
     def _closest_point_on_segment(self, p: pygame.math.Vector2, a: pygame.math.Vector2, b: pygame.math.Vector2) -> tuple[pygame.math.Vector2, float]:
         """
-        相信 gemini
         計算點 p 到線段 ab 的最短距離和最近點。優化：使用長度的平方 (length_squared)
         """
         ab = b - a
@@ -208,9 +252,10 @@ class Obstacle:
         
         return closest, distance_sq
     
-    def check_collision(self, boid) -> bool:
+    #真實多邊形碰撞邏輯，效能極差，已棄用
+    def polygon_collision(self, boid) -> bool:
         """
-        相信 gemini
+        從 gemini 抄來的，我也不懂
         檢查 Boid 是否與此障礙物發生碰撞，並解決碰撞。
         優化：嘗試使用 Bounding Box 快速剔除（這裡暫略），並優化迴圈內的計算。
         """
@@ -303,11 +348,17 @@ class Obstacle:
 
 #main
 #load
-birds = [Bird(random.uniform(0,SCREEN_WIDTH),random.uniform(0,SCREEN_HEIGHT)) for _ in range(Bird_Number)]
+birds = [Bird(random.choice([
+    {'x':0,'y':random.randint(0,SCREEN_HEIGHT)},
+    {'x':SCREEN_WIDTH,'y':random.randint(0,SCREEN_HEIGHT)},
+    {'x':random.randint(0,SCREEN_WIDTH),'y':0},
+    {'x':random.randint(0,SCREEN_WIDTH),'y':SCREEN_HEIGHT}
+    ])) for _ in range(Bird_Number)] #在邊緣生成 bird
+
 obstacles = [Obstacle(Obstacle.generate_random_polygon(
-    random.uniform(100,SCREEN_WIDTH-100),
-    random.uniform(100,SCREEN_HEIGHT-100),
-    80,120,random.randint(4,10))) for _ in range(Obstacle_Number)]
+    random.randint(100,SCREEN_WIDTH-100),
+    random.randint(100,SCREEN_HEIGHT-100),
+    80,100,random.randint(4,20))) for _ in range(Obstacle_Number)]
 #tick
 while Running:
     #取得動作
