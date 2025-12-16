@@ -23,9 +23,13 @@ python run_console.py setting.json
 用輸入的設定和之前存檔跑
 python run_console.py setting.json environment.json
 ```
+如果是在UI中輸入要讀取的檔案，預設director位置和runconsole.py同，且須記得加上 .json
+
+ex: data/setting_speed.json || data/data_speed1.json
 ## 檔案功用
-1. data : 存參數，模擬資料
-2. data/record : 存模擬紀錄
+1. 資料夾 data : 模擬的初始設定     ex: setting_speed.json 
+   或模擬跑到一半的鳥群和掠食者參數  ex: data_speed1.json                   
+2. 資料夾 data/record : 存模擬過程  ex: record_speed1.json
 3. initial.py : 生成預設參數文件
 4. read_data.py : 讀取資料
 5. run_console.py : 打開主控台並執行模擬

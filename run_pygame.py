@@ -602,6 +602,7 @@ def run_pygame(Setting, stop_event=None, shared_state_modify=None, shared_state_
         def consume_bird(self, bird):
             self.direction.rotate_ip(random.uniform(bird.position.x - self.position.x, bird.position.y - self.position.y))
             self.consume_time = bird.size/8*Setting["Overall_Predator"]["Consume_Time"]
+            self.color = (154,28,8)
             global Predator_Eat_Cnt
             Predator_Eat_Cnt+=1
 
@@ -613,6 +614,8 @@ def run_pygame(Setting, stop_event=None, shared_state_modify=None, shared_state_
                 acceleration = self.Attribute["MAX_Speed"]*DT #調整速率
             else:
                 self.consume_time-=DT
+                if (self.consume_time<=0):
+                    self.color = (255,30,45)
            
             #調整大小
             self.size = self.Attribute["Size"]
