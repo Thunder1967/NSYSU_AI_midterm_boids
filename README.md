@@ -14,20 +14,25 @@
 ## 執行時請使用 run_console.py
 如果跑檔案有輸入要讀取的檔案，可以在CMD執行python時中輸入，格式如下
 ```console
-用預設設定跑
+用預設設定跑 (進UI仍可更改要讀取的檔案)
 python run_console.py
 
 用輸入的設定跑
 python run_console.py setting.json
 
+ex: python run_console.py setting_speed.json
+
 用輸入的設定和之前存檔跑
 python run_console.py setting.json environment.json
-```
-如果是在UI中輸入要讀取的檔案，預設director位置和runconsole.py同，且須記得加上 .json
 
-ex: data/setting_speed.json || data/data_speed1.json
+ex: python run_console.py setting_speed.json data_speed1.json
+```
+輸入和保存檔案，僅須輸入檔名並記得加上.json，檔案皆會存在 data 資料夾中
+
+ex: setting_speed.json || data_speed1.json
 ## 檔案功用
 1. 資料夾 data : 模擬的初始設定     ex: setting_speed.json 
+
    或模擬跑到一半的鳥群和掠食者參數  ex: data_speed1.json                   
 2. 資料夾 data/record : 存模擬過程  ex: record_speed1.json
 3. initial.py : 生成預設參數文件

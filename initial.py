@@ -79,9 +79,9 @@ def setGlobal():
         }
     }
 
-def create_default(file_name = "data/default_setting.json"):
+def create_default(file_name = "setting_default.json"):
     Setting = setGlobal()
-    with open(file_name, "w") as f:
+    with open(f"data/{file_name}", "w") as f:
         json.dump(Setting, f)
     return file_name
 
