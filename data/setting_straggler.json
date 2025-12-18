@@ -1,0 +1,83 @@
+{
+  "verify": "Setting",
+  "Overall": {
+    "FPS": 60,
+    "Bounce_Damping": 0.8,
+    "Damping": 100,
+    "Interval_Of_Record": 0
+  },
+  "Evolution": {
+    "Init_Mutation_Rate": 0.5,
+    "Mutation_Rate": 0.1,
+    "Reproduce_Weight": 2
+  },
+  "Overall_Bird": {
+    "Number": 100,
+    "Color_Slow": [
+      75,
+      76,
+      255
+    ],
+    "Color_Fast": [
+      63,
+      255,
+      50
+    ],
+    "Movement_Accuracy": 100,
+    "Rotation_Weight": 10,
+    "Gen_Stamina": 80,
+    "MAX_Life_Time": 150
+  },
+  "Upper_Bound_Bird": {
+    "Size": 100,
+    "MAX_Speed": 200,
+    "MIN_Speed": 100
+  },
+  "Lower_Bound_Bird": {
+    "Size": 2,
+    "MAX_Speed": 20,
+    "MIN_Speed": 10,
+    "MAX_Stamina": 30
+  },
+  "Bird": {
+    "Size": 8,
+    "MIN_Speed": 20,
+    "MAX_Speed": 140,
+    "Perception_Radius": 40,
+    "Separation_Weight": 10,
+    "Alignment_Weight": 10,
+    "Cohesion_Weight": 10,
+    "Flee_Weight": 40,
+    "Alert_Radius": 50,
+    "MAX_Stamina": 60,
+    "Fitness": 0,
+    "Survival_Time": 0
+  },
+  "Overall_Predator": {
+    "Number": 8,
+    "Consume_Time": 0.8
+  },
+  "Predator": {
+    "Size": 10,
+    "MIN_Speed": 20,
+    "MAX_Speed": 240,
+    "Perception_Radius": 150,
+    "Separation_Weight": 10,
+    "Track_Weight": 20,
+    "Eat_Radius": 7,
+    "Track_Mode": 4
+  },
+  "Particle": {
+    "Size": 10,
+    "Num": 3,
+    "Lifetime": 25,
+    "Radious": 1,
+    "MIN_Speed": 15,
+    "MAX_Speed": 25,
+    "offset_angle": 120
+  },
+  "Obstacle": {
+    "Number": 0,
+    "Size": 80
+  }
+}

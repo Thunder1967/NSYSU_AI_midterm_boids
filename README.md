@@ -19,12 +19,10 @@ python run_console.py
 
 用輸入的設定跑
 python run_console.py setting.json
-
 ex: python run_console.py setting_speed.json
 
 用輸入的設定和之前存檔跑
 python run_console.py setting.json environment.json
-
 ex: python run_console.py setting_speed.json data_speed1.json
 ```
 輸入和保存檔案，僅須輸入檔名並記得加上.json，檔案皆會存在 data 資料夾中
