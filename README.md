@@ -24,6 +24,9 @@ ex: python run_console.py setting_speed.json
 用輸入的設定和之前存檔跑
 python run_console.py setting.json environment.json
 ex: python run_console.py setting_speed.json data_speed1.json
+
+若是要跑生態系，僅能在 cmd/terminal 輸入 python run_ecosystem.py setting_mixed.json data_mixed.json
+註：生態系的設定和data和其他模式不相容
 ```
 輸入和保存檔案，僅須輸入檔名並記得加上.json，檔案皆會存在 data 資料夾中
 
@@ -37,3 +40,4 @@ ex: setting_speed.json || data_speed1.json
 4. read_data.py : 讀取資料
 5. run_console.py : 打開主控台並執行模擬
 6. run_pygame.py : 執行模擬
+7. run_ecosystem.py : 模擬生態系
