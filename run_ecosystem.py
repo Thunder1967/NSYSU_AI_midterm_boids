@@ -22,7 +22,7 @@ BIRD_TYPE_COLORS = {
     "straggler": (0, 191, 255) # 深天藍
 }
 PREDATOR_TYPE_COLORS = {
-    "default":(255, 30, 45), # some kind of 紅色
+    "default":(255, 30, 45), # kind of 紅色
     "speed": (46, 139, 87),      # 海洋綠
     "marathon": (0, 100, 0),   # 深綠
     "landmine": (70, 130, 180),  # 剛藍
@@ -373,6 +373,11 @@ def run_pygame(Setting, stop_event=None, shared_state_modify=None, shared_state_
                     pos = random.choice(edges)
                 super(Predator, self).__init__(pos, self.Attribute["Size"], self.Attribute["MAX_Speed"], color)
         
+        def draw(self, screen):
+            super().draw(screen)
+            
+            pygame.draw.circle(screen, (255, 0, 0), (int(self.position.x), int(self.position.y)), 3)
+
         def track1(self,all_boids):
             '''
             追視野範圍內的 bird 質量中心
